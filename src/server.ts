@@ -13,6 +13,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use(authRouter);
 app.use(qaRouter);
 
-app.listen(env.PORT, () => {
-  console.log(`mock backend running on http://localhost:${env.PORT}`);
+app.listen(4000, "0.0.0.0", () => {
+  console.log("API listening on http://0.0.0.0:4000");
 });
+
