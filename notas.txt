@@ -1,0 +1,3 @@
+# Ejecutar el backend
+cd /Users/sebastiantrangol/Proyectos/banking-demo-backend-mock
+npm run dev
