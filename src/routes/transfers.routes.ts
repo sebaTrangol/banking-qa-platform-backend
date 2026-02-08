@@ -10,6 +10,7 @@ type TransferPayload = {
   fromAccountId?: string;
   toIdentifierType?: "RUT" | "EMAIL";
   toIdentifier?: string;
+  toAccountNumber?: string;
   amount?: number;
   comment?: string;
 };
@@ -29,9 +30,11 @@ transfersRouter.post("/transfers", requireAuth, applyQaFlags, (req, res) => {
   const fromAccountId = String(body.fromAccountId ?? "");
   const toIdentifierType = body.toIdentifierType;
   const rawIdentifier = String(body.toIdentifier ?? "");
+  const rawToAccountNumber = String(body.toAccountNumber ?? "");
   const amount = Number(body.amount ?? 0);
+  const normalizedToAccountNumber = rawToAccountNumber.replace(/\D/g, "");
 
-  if (!fromAccountId || !toIdentifierType || !rawIdentifier || !Number.isFinite(amount)) {
+  if (!fromAccountId || !toIdentifierType || !rawIdentifier || !normalizedToAccountNumber || !Number.isFinite(amount)) {
     return res.status(400).json({ errorCode: "INVALID_REQUEST", messageKey: "common.error.invalidRequest" });
   }
 
@@ -66,8 +69,8 @@ transfersRouter.post("/transfers", requireAuth, applyQaFlags, (req, res) => {
   }
 
   const recipientAccount = db
-    .prepare("SELECT id, balance, currency FROM accounts WHERE user_id = ? ORDER BY id LIMIT 1")
-    .get(recipient.id) as { id: string; balance: number; currency: string } | undefined;
+    .prepare("SELECT id, balance, currency FROM accounts WHERE user_id = ? AND number_masked = ?")
+    .get(recipient.id, normalizedToAccountNumber) as { id: string; balance: number; currency: string } | undefined;
   if (!recipientAccount) {
     return res.status(404).json({ errorCode: "RECIPIENT_ACCOUNT_NOT_FOUND", messageKey: "transfer.error.recipientAccountNotFound" });
   }
@@ -128,6 +131,7 @@ transfersRouter.post("/transfers", requireAuth, applyQaFlags, (req, res) => {
       to: {
         identifierType: toIdentifierType,
         identifier: rawIdentifier,
+        accountNumber: normalizedToAccountNumber,
         name: recipient.name,
       },
       amount,

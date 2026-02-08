@@ -102,7 +102,7 @@ export function seedDb() {
     { id: "usr_1", type: "RUT", identifier: "123456785", password: "123456", name: "Juan Pérez", blocked: 0 },
     { id: "usr_2", type: "EMAIL", identifier: "qa@demo.cl", password: "123456", name: "QA Demo", blocked: 0 },
     { id: "usr_3", type: "RUT", identifier: "111111111", password: "123456", name: "Blocked User", blocked: 0 },
-    { id: "usr_4", type: "RUT", identifier: "16855463K", password: "123456", name: "seba T", blocked: 1 },
+    { id: "usr_4", type: "RUT", identifier: "16855463K", password: "123456", name: "seba T", blocked: 0 },
     { id: "usr_5", type: "RUT", identifier: "163334445", password: "123456", name: "Nino Antonio", blocked: 0 },
     { id: "usr_6", type: "RUT", identifier: "201342347", password: "123456", name: "Gandita", blocked: 0 },
   ];
