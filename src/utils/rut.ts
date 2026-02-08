@@ -17,10 +17,10 @@ export function normalizeRut(input: string): string {
   }
   
   /**
-   * Valida RUT chileno con algoritmo módulo 11.
-   * Reglas:
+   * Valida RUT con formato básico (QA):
    * - Último carácter es el DV (0-9 o K)
    * - Cuerpo solo dígitos
+   * - NO valida módulo 11 (cualquier DV 0-9 es aceptado)
    */
   export function isValidRut(input: string): boolean {
     const rut = normalizeRut(input);
@@ -34,8 +34,7 @@ export function normalizeRut(input: string): string {
     if (!/^\d+$/.test(body)) return false;          // cuerpo solo dígitos
     if (!/^[0-9K]$/.test(dv)) return false;         // DV 0-9 o K
   
-    const expected = computeRutDv(body);
-    return dv === expected;
+    return true;
   }
   
   /**

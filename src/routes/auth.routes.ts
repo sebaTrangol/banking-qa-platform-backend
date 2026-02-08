@@ -1,8 +1,10 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
-import { store } from "../store/store";
 import { isValidRut, normalizeRut } from "../utils/rut";
+import { requireAuth } from "../middlewares/auth";
+import { applyQaFlags } from "../middlewares/qa";
+import { db } from "../db";
 
 
 export const authRouter = Router();
@@ -32,13 +34,15 @@ authRouter.post("/auth/login", (req, res) => {
   }
 
   const normalizedIdentifier =
-  identifierType === "RUT"
-    ? normalizeRut(String(identifier))
-    : identifier;
+    identifierType === "RUT"
+      ? normalizeRut(String(identifier))
+      : String(identifier).trim().toLowerCase();
 
-  const user = store.users.find(
-      u => u.type === identifierType && u.identifier === normalizedIdentifier
-  );
+  const user = db
+    .prepare("SELECT id, type, identifier, password, name, blocked FROM users WHERE type = ? AND identifier = ?")
+    .get(identifierType, normalizedIdentifier) as
+    | { id: string; type: "RUT" | "EMAIL"; identifier: string; password: string; name: string; blocked: number }
+    | undefined;
 
 
   if (!user || user.password !== password) {
@@ -58,24 +62,30 @@ authRouter.post("/auth/login", (req, res) => {
     ? new Date(Date.now()).toISOString()
     : new Date(Date.now() + env.TOKEN_TTL_SECONDS * 1000).toISOString();
 
-  // Flags por token (por defecto)
-  store.qaFlagsByToken.set(token, {
-    latencyMs: 0,
-    forceError: null,
-    offline: false,
-    forceSessionExpiry: false,
-    sessionPolicy: "single"
+  // Crear sesión
+  db.prepare(
+    `
+    INSERT INTO sessions (token, user_id, expires_at, revoked, device_platform, device_id)
+    VALUES (@token, @user_id, @expires_at, 0, @device_platform, @device_id)
+  `
+  ).run({
+    token,
+    user_id: user.id,
+    expires_at: expiresAt,
+    device_platform: device?.platform ?? null,
+    device_id: device?.id ?? null,
   });
 
-  // Policy single-session: revoca tokens previos del mismo user
-  const policy = store.qaFlagsByToken.get(token)!.sessionPolicy;
-  if (policy === "single") {
-    for (const [t, s] of store.sessionsByToken.entries()) {
-      if (s.userId === user.id) store.sessionsByToken.set(t, { ...s, revoked: true });
-    }
-  }
+  // Flags por token (por defecto)
+  db.prepare(
+    `
+    INSERT INTO qa_flags (token, latency_ms, force_error, offline, force_session_expiry, session_policy)
+    VALUES (@token, 0, NULL, 0, 0, 'single')
+  `
+  ).run({ token });
 
-  store.sessionsByToken.set(token, { token, userId: user.id, expiresAt, revoked: false, device });
+  // Policy single-session: revoca tokens previos del mismo user
+  db.prepare("UPDATE sessions SET revoked = 1 WHERE user_id = ? AND token <> ?").run(user.id, token);
 
   return res.status(200).json({
     session: {
@@ -89,4 +99,11 @@ authRouter.post("/auth/login", (req, res) => {
       }
     }
   });  
+});
+
+authRouter.post("/auth/logout", requireAuth, applyQaFlags, (req, res) => {
+  const token = (req as any).auth.token as string;
+  db.prepare("UPDATE sessions SET revoked = 1 WHERE token = ?").run(token);
+  db.prepare("DELETE FROM qa_flags WHERE token = ?").run(token);
+  return res.status(200).json({ ok: true });
 });

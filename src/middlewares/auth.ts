@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
-import { store } from "../store/store";
+import { db } from "../db";
 
 type JwtPayload = { sub?: string };
 
@@ -23,7 +23,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 
   // 2) sesión en store (revocado/expirado)
-  const session = store.sessionsByToken.get(token);
+  const session = db
+    .prepare("SELECT token, user_id, expires_at, revoked FROM sessions WHERE token = ?")
+    .get(token) as { token: string; user_id: string; expires_at: string; revoked: number } | undefined;
   if (!session) {
     return res.status(401).json({ errorCode: "UNAUTHORIZED", messageKey: "auth.error.sessionNotFound" });
   }
@@ -32,12 +34,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ errorCode: "SESSION_REVOKED", messageKey: "auth.error.sessionRevoked" });
   }
 
-  const expiresAtMs = Date.parse(session.expiresAt);
+  const expiresAtMs = Date.parse(session.expires_at);
   if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
     return res.status(401).json({ errorCode: "SESSION_EXPIRED", messageKey: "auth.error.sessionExpired" });
   }
 
   // inyectar contexto
-  (req as any).auth = { token, userId: session.userId };
+  (req as any).auth = { token, userId: session.user_id };
   next();
 }
