@@ -32,7 +32,15 @@ Ver usuario por RUT:
 ```sql
 SELECT id, type, identifier, name, blocked
 FROM users
-WHERE identifier = '16855463K';
+WHERE identifier = '123456785';
+```
+
+Cambiar nombre:
+
+```sql
+UPDATE users
+SET name = 'Chimu'
+WHERE identifier = '111111111';
 ```
 
 Desbloquear usuario:
